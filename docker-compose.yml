@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: ./ticketing-app-frontend
+    container_name: vue-app
+    networks:
+      - ticketing-app
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_URL=http://backend:8000
+
+  backend:
+    build: ./ticketing-app-backend
+    container_name: django-app
+    networks:
+      - ticketing-app
+    expose:
+      - "8000"
+    environment:
+      - DB_HOST=db
+      - DB_NAME=app_db
+      - DB_USER=user
+      - DB_PASSWORD=password
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      retries: 5
+      start_period: 10s
+      timeout: 5s
+
+  db:
+    image: postgres:latest
+    container_name: postgres-db
+    networks:
+      - ticketing-app
+    environment:
+      - POSTGRES_DB=app_db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx-proxy
+    networks:
+      - ticketing-app
+    volumes:
+      - ./ticketing-app-nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - frontend
+      - backend
+    command: /wait-for-it.sh backend:8000 -- nginx -g 'daemon off;'
+
+networks:
+  ticketing-app:
+    driver: bridge
